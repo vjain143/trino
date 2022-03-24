@@ -104,7 +104,7 @@ public class TestSharedGlueMetastore
                 hdfsEnvironment,
                 new GlueHiveMetastoreConfig(),
                 directExecutor(),
-                new DefaultGlueColumnStatisticsProviderFactory(new GlueHiveMetastoreConfig(), directExecutor(), directExecutor()),
+                new DefaultGlueColumnStatisticsProviderFactory(directExecutor(), directExecutor()),
                 Optional.empty(),
                 table -> true);
         queryRunner.installPlugin(new TestingHivePlugin(glueMetastore));

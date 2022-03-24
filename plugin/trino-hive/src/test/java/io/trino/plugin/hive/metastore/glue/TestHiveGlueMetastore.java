@@ -218,7 +218,7 @@ public class TestHiveGlueMetastore
                 HDFS_ENVIRONMENT,
                 glueConfig,
                 executor,
-                new DefaultGlueColumnStatisticsProviderFactory(glueConfig, executor, executor),
+                new DefaultGlueColumnStatisticsProviderFactory(executor, executor),
                 Optional.empty(),
                 new DefaultGlueMetastoreTableFilterProvider(
                         new MetastoreConfig()

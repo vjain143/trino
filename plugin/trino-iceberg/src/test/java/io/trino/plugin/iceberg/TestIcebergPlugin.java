@@ -74,6 +74,7 @@ public class TestIcebergPlugin
                 "test",
                 Map.of(
                         "iceberg.catalog.type", "glue",
+                        "hive.metastore.glue.catalogid", "123",
                         "hive.metastore.glue.region", "us-east-1"),
                 new TestingConnectorContext())
                 .shutdown();
@@ -85,15 +86,6 @@ public class TestIcebergPlugin
                         "hive.metastore.uri", "thrift://foo:1234"),
                 new TestingConnectorContext()))
                 .hasMessageContaining("Error: Configuration property 'hive.metastore.uri' was not used");
-
-        assertThatThrownBy(() -> factory.create(
-                "test",
-                Map.of(
-                        "iceberg.catalog.type", "glue",
-                        "hive.metastore.glue.catalogid", "123",
-                        "hive.metastore.glue.region", "us-east-1"),
-                new TestingConnectorContext()))
-                .hasMessageContaining("catalogId configuration is not supported");
     }
 
     @Test

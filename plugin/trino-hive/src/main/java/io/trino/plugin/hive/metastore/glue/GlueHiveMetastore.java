@@ -172,7 +172,6 @@ public class GlueHiveMetastore
     private final HdfsContext hdfsContext;
     private final AWSGlueAsync glueClient;
     private final Optional<String> defaultDir;
-    private final String catalogId;
     private final int partitionSegments;
     private final Executor partitionsReadExecutor;
     private final GlueMetastoreStats stats = new GlueMetastoreStats();
@@ -194,7 +193,6 @@ public class GlueHiveMetastore
         this.hdfsContext = new HdfsContext(ConnectorIdentity.ofUser(DEFAULT_METASTORE_USER));
         this.glueClient = createAsyncGlueClient(glueConfig, requestHandler, stats.newRequestMetricsCollector());
         this.defaultDir = glueConfig.getDefaultWarehouseDir();
-        this.catalogId = glueConfig.getCatalogId().orElse(null);
         this.partitionSegments = glueConfig.getPartitionSegments();
         this.partitionsReadExecutor = requireNonNull(partitionsReadExecutor, "partitionsReadExecutor is null");
         this.assumeCanonicalPartitionKeys = glueConfig.isAssumeCanonicalPartitionKeys();
@@ -211,7 +209,10 @@ public class GlueHiveMetastore
                 .withMetricsCollector(metricsCollector)
                 .withClientConfiguration(clientConfig);
 
-        requestHandler.ifPresent(asyncGlueClientBuilder::setRequestHandlers);
+        ImmutableList.Builder<RequestHandler2> requestHandlers = ImmutableList.builder();
+        requestHandler.ifPresent(requestHandlers::add);
+        config.getCatalogId().ifPresent(catalogId -> requestHandlers.add(new GlueCatalogIdRequestHandler(catalogId)));
+        asyncGlueClientBuilder.setRequestHandlers(requestHandlers.build().toArray(RequestHandler2[]::new));
 
         if (config.getGlueEndpointUrl().isPresent()) {
             checkArgument(config.getGlueRegion().isPresent(), "Glue region must be set when Glue endpoint URL is set");
@@ -278,7 +279,7 @@ public class GlueHiveMetastore
     {
         try {
             GetDatabaseResult result = stats.getGetDatabase().call(() ->
-                    glueClient.getDatabase(new GetDatabaseRequest().withCatalogId(catalogId).withName(databaseName)));
+                    glueClient.getDatabase(new GetDatabaseRequest().withName(databaseName)));
             return Optional.of(GlueToTrinoConverter.convertDatabase(result.getDatabase()));
         }
         catch (EntityNotFoundException e) {
@@ -295,7 +296,7 @@ public class GlueHiveMetastore
         try {
             List<String> databaseNames = getPaginatedResults(
                     glueClient::getDatabases,
-                    new GetDatabasesRequest().withCatalogId(catalogId),
+                    new GetDatabasesRequest(),
                     GetDatabasesRequest::setNextToken,
                     GetDatabasesResult::getNextToken,
                     stats.getGetDatabases())
@@ -316,7 +317,6 @@ public class GlueHiveMetastore
         try {
             GetTableResult result = stats.getGetTable().call(() ->
                     glueClient.getTable(new GetTableRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(databaseName)
                             .withName(tableName)));
             return Optional.of(GlueToTrinoConverter.convertTable(result.getTable(), databaseName));
@@ -372,7 +372,6 @@ public class GlueHiveMetastore
             tableInput.setParameters(statisticsParameters);
             table = Table.builder(table).setParameters(statisticsParameters).build();
             stats.getUpdateTable().call(() -> glueClient.updateTable(new UpdateTableRequest()
-                    .withCatalogId(catalogId)
                     .withDatabaseName(databaseName)
                     .withTableInput(tableInput)));
             columnStatisticsProvider.updateTableColumnStatistics(table, updatedStatistics.getColumnStatistics());
@@ -429,7 +428,6 @@ public class GlueHiveMetastore
             // Update basic statistics
             long startTimestamp = System.currentTimeMillis();
             partitionUpdateRequestsFutures.add(glueClient.batchUpdatePartitionAsync(new BatchUpdatePartitionRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(table.getDatabaseName())
                             .withTableName(table.getTableName())
                             .withEntries(partitionUpdateRequestsPartition),
@@ -454,7 +452,6 @@ public class GlueHiveMetastore
             List<String> tableNames = getPaginatedResults(
                     glueClient::getTables,
                     new GetTablesRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(databaseName),
                     GetTablesRequest::setNextToken,
                     GetTablesResult::getNextToken,
@@ -489,7 +486,6 @@ public class GlueHiveMetastore
             List<String> views = getPaginatedResults(
                     glueClient::getTables,
                     new GetTablesRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(databaseName),
                     GetTablesRequest::setNextToken,
                     GetTablesResult::getNextToken,
@@ -523,7 +519,7 @@ public class GlueHiveMetastore
         try {
             DatabaseInput databaseInput = GlueInputConverter.convertDatabase(database);
             stats.getCreateDatabase().call(() ->
-                    glueClient.createDatabase(new CreateDatabaseRequest().withCatalogId(catalogId).withDatabaseInput(databaseInput)));
+                    glueClient.createDatabase(new CreateDatabaseRequest().withDatabaseInput(databaseInput)));
         }
         catch (AlreadyExistsException e) {
             throw new SchemaAlreadyExistsException(database.getDatabaseName());
@@ -550,7 +546,7 @@ public class GlueHiveMetastore
 
         try {
             stats.getDeleteDatabase().call(() ->
-                    glueClient.deleteDatabase(new DeleteDatabaseRequest().withCatalogId(catalogId).withName(databaseName)));
+                    glueClient.deleteDatabase(new DeleteDatabaseRequest().withName(databaseName)));
         }
         catch (EntityNotFoundException e) {
             throw new SchemaNotFoundException(databaseName);
@@ -572,7 +568,6 @@ public class GlueHiveMetastore
             DatabaseInput renamedDatabase = GlueInputConverter.convertDatabase(database).withName(newDatabaseName);
             stats.getUpdateDatabase().call(() ->
                     glueClient.updateDatabase(new UpdateDatabaseRequest()
-                            .withCatalogId(catalogId)
                             .withName(databaseName)
                             .withDatabaseInput(renamedDatabase)));
         }
@@ -594,7 +589,6 @@ public class GlueHiveMetastore
             TableInput input = GlueInputConverter.convertTable(table);
             stats.getCreateTable().call(() ->
                     glueClient.createTable(new CreateTableRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(table.getDatabaseName())
                             .withTableInput(input)));
         }
@@ -617,7 +611,6 @@ public class GlueHiveMetastore
         try {
             stats.getDeleteTable().call(() ->
                     glueClient.deleteTable(new DeleteTableRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(databaseName)
                             .withName(tableName)));
         }
@@ -654,7 +647,6 @@ public class GlueHiveMetastore
             TableInput newTableInput = GlueInputConverter.convertTable(newTable);
             stats.getUpdateTable().call(() ->
                     glueClient.updateTable(new UpdateTableRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(databaseName)
                             .withTableInput(newTableInput)));
         }
@@ -693,7 +685,6 @@ public class GlueHiveMetastore
 
             stats.getUpdateTable().call(() ->
                     glueClient.updateTable(new UpdateTableRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(databaseName)
                             .withTableInput(newTableInput)));
         }
@@ -773,7 +764,6 @@ public class GlueHiveMetastore
         try {
             GetPartitionResult result = stats.getGetPartition().call(() ->
                     glueClient.getPartition(new GetPartitionRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(table.getDatabaseName())
                             .withTableName(table.getTableName())
                             .withPartitionValues(partitionValues)));
@@ -842,7 +832,6 @@ public class GlueHiveMetastore
             List<Partition> partitions = getPaginatedResults(
                     glueClient::getPartitions,
                     new GetPartitionsRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(table.getDatabaseName())
                             .withTableName(table.getTableName())
                             .withExpression(expression)
@@ -921,7 +910,6 @@ public class GlueHiveMetastore
                 for (List<PartitionValueList> partitions : Lists.partition(pendingPartitions, BATCH_GET_PARTITION_MAX_PAGE_SIZE)) {
                     long startTimestamp = System.currentTimeMillis();
                     batchGetPartitionFutures.add(glueClient.batchGetPartitionAsync(new BatchGetPartitionRequest()
-                                    .withCatalogId(catalogId)
                                     .withDatabaseName(table.getDatabaseName())
                                     .withTableName(table.getTableName())
                                     .withPartitionsToGet(partitions),
@@ -969,7 +957,6 @@ public class GlueHiveMetastore
                     long startTime = System.currentTimeMillis();
                     futures.add(glueClient.batchCreatePartitionAsync(
                             new BatchCreatePartitionRequest()
-                                    .withCatalogId(catalogId)
                                     .withDatabaseName(databaseName)
                                     .withTableName(tableName)
                                     .withPartitionInputList(partitionInputs),
@@ -1029,7 +1016,6 @@ public class GlueHiveMetastore
         try {
             stats.getDeletePartition().call(() ->
                     glueClient.deletePartition(new DeletePartitionRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(databaseName)
                             .withTableName(tableName)
                             .withPartitionValues(parts)));
@@ -1051,7 +1037,6 @@ public class GlueHiveMetastore
             PartitionInput newPartition = convertPartition(partition);
             stats.getUpdatePartition().call(() ->
                     glueClient.updatePartition(new UpdatePartitionRequest()
-                            .withCatalogId(catalogId)
                             .withDatabaseName(databaseName)
                             .withTableName(tableName)
                             .withPartitionInput(newPartition)
