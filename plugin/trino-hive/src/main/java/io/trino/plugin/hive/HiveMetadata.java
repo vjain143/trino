@@ -753,10 +753,14 @@ public class HiveMetadata
             }
             catch (TrinoException e) {
                 // Skip this table if there's a failure due to Hive, a bad Serde, or bad metadata
-                if (!e.getErrorCode().getType().equals(ErrorType.EXTERNAL)) {
-                    throw e;
+                if (e.getErrorCode().getType().equals(ErrorType.EXTERNAL)) {
+                    return Stream.empty();
                 }
-                return Stream.empty();
+                // Skip this table if the type is unsupported. e.g. Iceberg tables in Hive connector
+                if (e.getErrorCode().equals(UNSUPPORTED_TABLE_TYPE.toErrorCode())) {
+                    return Stream.empty();
+                }
+                throw e;
             }
         });
     }
