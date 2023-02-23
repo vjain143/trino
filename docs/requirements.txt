@@ -5,7 +5,7 @@ css-html-js-minify==2.5.5
 idna==2.9
 Jinja2==2.11.1
 lxml==4.5.2
-markdown-it-py==0.5.6
+markdown-it-py==2.2.0
 myst-parser==0.12.10
 packaging==20.3
 Pillow==7.0.0
