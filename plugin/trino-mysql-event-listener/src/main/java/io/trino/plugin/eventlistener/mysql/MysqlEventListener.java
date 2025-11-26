@@ -14,6 +14,7 @@
 package io.trino.plugin.eventlistener.mysql;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
 import com.google.inject.Inject;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -57,6 +59,7 @@ public class MysqlEventListener
     private final JsonCodec<List<QueryInputMetadata>> inputsJsonCodec;
     private final JsonCodec<QueryOutputMetadata> outputJsonCodec;
     private final JsonCodec<List<TrinoWarning>> warningsJsonCodec;
+    private final MysqlEventListenerConfig config;
 
     @Inject
     public MysqlEventListener(
@@ -75,6 +78,7 @@ public class MysqlEventListener
         this.inputsJsonCodec = requireNonNull(inputsJsonCodec, "inputsJsonCodec is null");
         this.outputJsonCodec = requireNonNull(outputJsonCodec, "outputJsonCodec is null");
         this.warningsJsonCodec = requireNonNull(warningsJsonCodec, "warningsJsonCodec is null");
+        this.config = requireNonNull(config, "config is null");
     }
 
     @PostConstruct
@@ -107,7 +111,7 @@ public class MysqlEventListener
                 metadata.getPreparedQuery(),
                 metadata.getQueryState(),
                 metadata.getPlan(),
-                metadata.getPayload(),
+                columnExcluded("stage_info_json") ? Optional.empty() : metadata.getPayload(),
                 context.getUser(),
                 context.getPrincipal(),
                 context.getTraceToken(),
@@ -157,7 +161,7 @@ public class MysqlEventListener
                 stats.getPhysicalInputRows(),
                 stats.getInternalNetworkBytes(),
                 stats.getInternalNetworkRows(),
-                stats.getInternalNetworkBytes() + stats.getPhysicalInputBytes(),
+                stats.getTotalBytes(),
                 stats.getProcessedInputRows(),
                 stats.getOutputBytes(),
                 stats.getOutputRows(),
@@ -169,6 +173,21 @@ public class MysqlEventListener
                 context.getRetryPolicy(),
                 createOperatorSummariesJson(metadata.getQueryId(), stats.getOperatorSummaries()));
         dao.store(entity);
+    }
+
+    private boolean columnExcluded(String columnName)
+    {
+        String excludeColumns = config.getExcludeColumns();
+        if (excludeColumns == null || excludeColumns.trim().isEmpty()) {
+            return false;
+        }
+        Set<String> excludedColumns = Splitter.on(',')
+                .trimResults()
+                .omitEmptyStrings()
+                .splitToStream(excludeColumns)
+                .collect(Collectors.toSet());
+
+        return excludedColumns.contains(columnName);
     }
 
     private Optional<String> createOperatorSummariesJson(String queryId, List<String> summaries)

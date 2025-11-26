@@ -26,6 +26,7 @@ public class MysqlEventListenerConfig
 {
     private String url;
     private boolean terminateOnInitializationFailure = true;
+    private String excludeColumns;
 
     @NotNull
     public String getUrl()
@@ -33,11 +34,24 @@ public class MysqlEventListenerConfig
         return url;
     }
 
+    public String getExcludeColumns()
+    {
+        return excludeColumns;
+    }
+
     @ConfigSecuritySensitive
     @Config("mysql-event-listener.db.url")
     public MysqlEventListenerConfig setUrl(String url)
     {
         this.url = url;
+        return this;
+    }
+
+    @ConfigSecuritySensitive
+    @Config("mysql-event-listener.db.exclude.columns")
+    public MysqlEventListenerConfig setExcludeColumns(String excludeColumns)
+    {
+        this.excludeColumns = excludeColumns;
         return this;
     }
 
