@@ -71,7 +71,8 @@ public class QueryEventFilterPolicy
         }
 
         // Check query type if present
-        Optional<String> queryType = metadata.getQueryType();
+        Optional<String> queryType = event.getContext().getQueryType()
+                .map(Enum::name);
         if (queryType.isPresent() && ignoredQueryTypes.contains(queryType.get())) {
             return false;
         }
@@ -99,7 +100,8 @@ public class QueryEventFilterPolicy
         }
 
         // Check query type if present
-        Optional<String> queryType = metadata.getQueryType();
+        Optional<String> queryType = event.getContext().getQueryType()
+                .map(Enum::name);
         if (queryType.isPresent() && ignoredQueryTypes.contains(queryType.get())) {
             return false;
         }

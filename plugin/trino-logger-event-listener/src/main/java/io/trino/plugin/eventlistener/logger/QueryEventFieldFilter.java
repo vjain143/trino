@@ -15,6 +15,7 @@ package io.trino.plugin.eventlistener.logger;
 
 import io.airlift.units.DataSize;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
@@ -105,7 +106,7 @@ public class QueryEventFieldFilter
         }
 
         String fieldValue = json.substring(valueStartIndex, valueEndIndex);
-        byte[] valueBytes = fieldValue.getBytes();
+        byte[] valueBytes = fieldValue.getBytes(StandardCharsets.UTF_8);
 
         long effectiveLimit = Math.min(maxFieldSizeBytes, truncationSizeLimitBytes);
         if (valueBytes.length <= effectiveLimit) {
@@ -150,16 +151,16 @@ public class QueryEventFieldFilter
             return value;
         }
 
-        byte[] bytes = value.getBytes();
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         if (bytes.length <= maxBytes) {
             return value;
         }
 
         // Truncate string to fit within maxBytes
-        String truncated = new String(bytes, 0, (int) Math.min(maxBytes, bytes.length));
+        String truncated = new String(bytes, 0, (int) Math.min(maxBytes, bytes.length), StandardCharsets.UTF_8);
 
         // Remove any incomplete characters at the end
-        while (truncated.getBytes().length > maxBytes && truncated.length() > 0) {
+        while (truncated.getBytes(StandardCharsets.UTF_8).length > maxBytes && truncated.length() > 0) {
             truncated = truncated.substring(0, truncated.length() - 1);
         }
 

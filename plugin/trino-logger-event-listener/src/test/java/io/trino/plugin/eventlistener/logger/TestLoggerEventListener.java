@@ -40,7 +40,10 @@ public class TestLoggerEventListener
     @Test
     public void testQueryCreatedEventLogged()
     {
-        LoggerEventListener listener = new LoggerEventListener(new SimpleJsonCodec<>(), new SimpleJsonCodec<>(), new LoggerEventListenerConfig().setLogCreated(true));
+        LoggerEventListener listener = new LoggerEventListener(
+                JsonCodec.jsonCodec(QueryCompletedEvent.class),
+                JsonCodec.jsonCodec(QueryCreatedEvent.class),
+                new LoggerEventListenerConfig().setLogCreated(true));
         QueryCreatedEvent event = new QueryCreatedEvent(Instant.now(), createContext(), createMetadata("QUEUED"));
         assertThatCode(() -> listener.queryCreated(event)).doesNotThrowAnyException();
     }
@@ -48,7 +51,10 @@ public class TestLoggerEventListener
     @Test
     public void testQueryCompletedEventLogged()
     {
-        LoggerEventListener listener = new LoggerEventListener(new SimpleJsonCodec<>(), new SimpleJsonCodec<>(), new LoggerEventListenerConfig().setLogCompleted(true));
+        LoggerEventListener listener = new LoggerEventListener(
+                JsonCodec.jsonCodec(QueryCompletedEvent.class),
+                JsonCodec.jsonCodec(QueryCreatedEvent.class),
+                new LoggerEventListenerConfig().setLogCompleted(true));
         QueryCompletedEvent event = new QueryCompletedEvent(
                 createMetadata("FINISHED"),
                 createStatistics(),
@@ -160,27 +166,5 @@ public class TestLoggerEventListener
                 Map.of(),
                 Map.of(),
                 Optional.empty());
-    }
-
-    private static class SimpleJsonCodec<T>
-            implements JsonCodec<T>
-    {
-        @Override
-        public String toJson(T object)
-        {
-            return "{\"query\":\"SELECT * FROM very_long_table_name\"}";
-        }
-
-        @Override
-        public T fromJson(String json)
-        {
-            return null;
-        }
-
-        @Override
-        public T fromBytes(byte[] json)
-        {
-            return null;
-        }
     }
 }

@@ -16,6 +16,7 @@ package io.trino.plugin.eventlistener.logger;
 import io.airlift.units.DataSize;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
@@ -67,10 +68,11 @@ public class TestQueryEventFieldFilter
     public void testTruncateMultibyteCharacters()
     {
         String value = "SELECT * FROM table WHERE emoji = '😀😀😀😀😀'";
-        String result = QueryEventFieldFilter.truncateString(value, 30);
+        int maxBytes = 30;
+        String result = QueryEventFieldFilter.truncateString(value, maxBytes);
         assertThat(result).contains("...[TRUNCATED]");
-        // Ensure byte length is within limit
-        assertThat(result.getBytes().length).isLessThanOrEqualTo(40);
+        int truncationMarkerBytes = "...[TRUNCATED]".getBytes(StandardCharsets.UTF_8).length;
+        assertThat(result.getBytes(StandardCharsets.UTF_8).length).isLessThanOrEqualTo(maxBytes + truncationMarkerBytes);
     }
 
     @Test
