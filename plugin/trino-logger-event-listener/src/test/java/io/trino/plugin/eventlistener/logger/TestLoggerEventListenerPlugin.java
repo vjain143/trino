@@ -13,6 +13,7 @@
  */
 package io.trino.plugin.eventlistener.logger;
 
+import io.trino.spi.eventlistener.EventListenerFactory;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,12 +31,12 @@ public class TestLoggerEventListenerPlugin
     public void testGetEventListenerFactories()
     {
         LoggerEventListenerPlugin plugin = new LoggerEventListenerPlugin();
-        Iterable<io.trino.spi.eventlistener.EventListenerFactory> factories = plugin.getEventListenerFactories();
+        Iterable<EventListenerFactory> factories = plugin.getEventListenerFactories();
 
         assertThat(factories).isNotNull();
         assertThat(factories.iterator().hasNext()).isTrue();
 
-        io.trino.spi.eventlistener.EventListenerFactory factory = factories.iterator().next();
+        EventListenerFactory factory = factories.iterator().next();
         assertThat(factory).isNotNull();
         assertThat(factory).isInstanceOf(LoggerEventListenerFactory.class);
     }
@@ -44,8 +45,8 @@ public class TestLoggerEventListenerPlugin
     public void testGetFactoryName()
     {
         LoggerEventListenerPlugin plugin = new LoggerEventListenerPlugin();
-        Iterable<io.trino.spi.eventlistener.EventListenerFactory> factories = plugin.getEventListenerFactories();
-        io.trino.spi.eventlistener.EventListenerFactory factory = factories.iterator().next();
+        Iterable<EventListenerFactory> factories = plugin.getEventListenerFactories();
+        EventListenerFactory factory = factories.iterator().next();
 
         assertThat(factory.getName()).isEqualTo("logger");
     }

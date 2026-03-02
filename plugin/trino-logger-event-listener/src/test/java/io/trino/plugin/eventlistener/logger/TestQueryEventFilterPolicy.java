@@ -19,6 +19,7 @@ import io.trino.spi.TrinoWarning;
 import io.trino.spi.WarningCode;
 import io.trino.spi.eventlistener.QueryCompletedEvent;
 import io.trino.spi.eventlistener.QueryContext;
+import io.trino.spi.eventlistener.QueryCreatedEvent;
 import io.trino.spi.eventlistener.QueryFailureInfo;
 import io.trino.spi.eventlistener.QueryIOMetadata;
 import io.trino.spi.eventlistener.QueryMetadata;
@@ -42,7 +43,7 @@ public class TestQueryEventFilterPolicy
     public void testShouldFilterCreatedByState()
     {
         QueryEventFilterPolicy filter = new QueryEventFilterPolicy(Set.of("QUEUED"), Set.of(), Set.of(), Set.of());
-        assertThat(filter.shouldLogQueryCreated(new io.trino.spi.eventlistener.QueryCreatedEvent(
+        assertThat(filter.shouldLogQueryCreated(new QueryCreatedEvent(
                 Instant.now(),
                 createContext(),
                 createMetadata("QUEUED", Optional.empty(), "SELECT")))).isFalse();
