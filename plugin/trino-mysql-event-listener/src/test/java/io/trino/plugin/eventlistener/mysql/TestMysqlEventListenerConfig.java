@@ -29,8 +29,7 @@ final class TestMysqlEventListenerConfig
     {
         assertRecordedDefaults(recordDefaults(MysqlEventListenerConfig.class)
                 .setUrl(null)
-                .setTerminateOnInitializationFailure(true)
-                .setExcludeColumns(null));
+                .setTerminateOnInitializationFailure(true));
     }
 
     @Test
@@ -38,13 +37,11 @@ final class TestMysqlEventListenerConfig
     {
         Map<String, String> properties = Map.of(
                 "mysql-event-listener.db.url", "jdbc:mysql://example.net:3306",
-                "mysql-event-listener.terminate-on-initialization-failure", "false",
-                "mysql-event-listener.db.exclude.columns", "plan,payload");
+                "mysql-event-listener.terminate-on-initialization-failure", "false");
 
         MysqlEventListenerConfig expected = new MysqlEventListenerConfig()
                 .setUrl("jdbc:mysql://example.net:3306")
-                .setTerminateOnInitializationFailure(false)
-                .setExcludeColumns("plan,payload");
+                .setTerminateOnInitializationFailure(false);
 
         assertFullMapping(properties, expected);
     }

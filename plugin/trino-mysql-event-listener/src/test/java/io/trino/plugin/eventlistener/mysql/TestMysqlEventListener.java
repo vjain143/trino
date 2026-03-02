@@ -36,7 +36,6 @@ import io.trino.spi.resourcegroups.QueryType;
 import io.trino.spi.resourcegroups.ResourceGroupId;
 import io.trino.spi.session.ResourceEstimates;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -367,14 +366,8 @@ final class TestMysqlEventListener
     @BeforeAll
     void setup()
     {
-        mysqlContainer = new MySQLContainer<>("mysql:8.0.36");
-        try {
-            mysqlContainer.start();
-        }
-        catch (Exception e) {
-            // Skip test if Docker is not available
-            Assumptions.assumeTrue(false, "Docker is not available: " + e.getMessage());
-        }
+        mysqlContainer = new MySQLContainer("mysql:8.0.36");
+        mysqlContainer.start();
         mysqlContainerUrl = getJdbcUrl(mysqlContainer);
         eventListener = new MysqlEventListenerFactory()
                 .create(Map.of("mysql-event-listener.db.url", mysqlContainerUrl), new TestingEventListenerContext());
