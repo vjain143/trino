@@ -13,6 +13,8 @@
  */
 package io.trino.plugin.eventlistener.logger;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import io.airlift.json.ObjectMapperProvider;
 import io.airlift.units.DataSize;
 import org.junit.jupiter.api.Test;
 
@@ -110,5 +112,83 @@ public class TestQueryEventFieldFilter
                 DataSize.of(50, KILOBYTE));
 
         assertThat(filter).isNotNull();
+    }
+
+    @Test
+    public void testApplyFilteringExcludesField()
+            throws Exception
+    {
+        QueryEventFieldFilter filter = new QueryEventFieldFilter(
+                Set.of("user"),
+                DataSize.of(4, KILOBYTE),
+                Set.of(),
+                DataSize.of(2, KILOBYTE));
+
+        String filtered = filter.applyFiltering("{\"user\":\"alice\",\"query\":\"select 1\"}");
+        JsonNode filteredNode = new ObjectMapperProvider().get().readTree(filtered);
+
+        assertThat(filteredNode.get("user").isNull()).isTrue();
+        assertThat(filteredNode.get("query").asText()).isEqualTo("select 1");
+    }
+
+    @Test
+    public void testApplyFilteringTruncatesConfiguredField()
+            throws Exception
+    {
+        QueryEventFieldFilter filter = new QueryEventFieldFilter(
+                Set.of(),
+                DataSize.of(100, KILOBYTE),
+                Set.of("query"),
+                DataSize.ofBytes(10));
+
+        String filtered = filter.applyFiltering("{\"query\":\"SELECT very_long_statement\"}");
+        JsonNode filteredNode = new ObjectMapperProvider().get().readTree(filtered);
+
+        assertThat(filteredNode.get("query").asText()).contains("...[TRUNCATED]");
+    }
+
+    @Test
+    public void testApplyFilteringHandlesNestedFields()
+            throws Exception
+    {
+        QueryEventFieldFilter filter = new QueryEventFieldFilter(
+                Set.of("password"),
+                DataSize.of(100, KILOBYTE),
+                Set.of("query"),
+                DataSize.ofBytes(8));
+
+        String json = "{\"context\":{\"password\":\"secret\"},\"items\":[{\"query\":\"abcdefghijk\"}]}";
+        String filtered = filter.applyFiltering(json);
+        JsonNode filteredNode = new ObjectMapperProvider().get().readTree(filtered);
+
+        assertThat(filteredNode.path("context").path("password").isNull()).isTrue();
+        assertThat(filteredNode.path("items").get(0).path("query").asText()).contains("...[TRUNCATED]");
+    }
+
+    @Test
+    public void testApplyFilteringHandlesDeepNestedObjectsAndArrays()
+            throws Exception
+    {
+        QueryEventFieldFilter filter = new QueryEventFieldFilter(
+                Set.of("password", "token"),
+                DataSize.of(100, KILOBYTE),
+                Set.of("query"),
+                DataSize.ofBytes(6));
+
+        String json = "{\"query\":\"top-level-long-query\","
+                + "\"level1\":{\"password\":\"secret\",\"query\":\"nested-long-query\","
+                + "\"level2\":[{\"token\":\"abc\",\"query\":\"array-item-long-query\"},"
+                + "{\"nested\":{\"password\":\"hidden\",\"query\":\"deep-long-query\"}}]}}";
+
+        String filtered = filter.applyFiltering(json);
+        JsonNode filteredNode = new ObjectMapperProvider().get().readTree(filtered);
+
+        assertThat(filteredNode.path("query").asText()).contains("...[TRUNCATED]");
+        assertThat(filteredNode.path("level1").path("password").isNull()).isTrue();
+        assertThat(filteredNode.path("level1").path("query").asText()).contains("...[TRUNCATED]");
+        assertThat(filteredNode.path("level1").path("level2").get(0).path("token").isNull()).isTrue();
+        assertThat(filteredNode.path("level1").path("level2").get(0).path("query").asText()).contains("...[TRUNCATED]");
+        assertThat(filteredNode.path("level1").path("level2").get(1).path("nested").path("password").isNull()).isTrue();
+        assertThat(filteredNode.path("level1").path("level2").get(1).path("nested").path("query").asText()).contains("...[TRUNCATED]");
     }
 }

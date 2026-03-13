@@ -13,9 +13,16 @@
  */
 package io.trino.plugin.eventlistener.logger;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.airlift.json.ObjectMapperProvider;
 import io.airlift.units.DataSize;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
@@ -29,6 +36,8 @@ import static java.util.Objects.requireNonNull;
  */
 public class QueryEventFieldFilter
 {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapperProvider().get();
+
     private final Set<String> excludedFields;
     private final Set<String> truncatedFields;
     private final long maxFieldSizeBytes;
@@ -52,94 +61,60 @@ public class QueryEventFieldFilter
      */
     public String applyFiltering(String json)
     {
-        json = applyFieldExclusion(json);
-        if (truncatedFields.isEmpty()) {
+        if (json.isEmpty() || (excludedFields.isEmpty() && truncatedFields.isEmpty())) {
             return json;
         }
-        return applyFieldTruncation(json);
+
+        JsonNode root;
+        try {
+            root = OBJECT_MAPPER.readTree(json);
+        }
+        catch (JsonProcessingException e) {
+            return json;
+        }
+
+        filterNode(root);
+
+        try {
+            return OBJECT_MAPPER.writeValueAsString(root);
+        }
+        catch (JsonProcessingException e) {
+            return json;
+        }
     }
 
-    private String applyFieldExclusion(String json)
+    private void filterNode(JsonNode node)
     {
-        if (excludedFields.isEmpty() || json.isEmpty()) {
-            return json;
-        }
-        for (String field : excludedFields) {
-            json = nullOutFieldInJson(json, field);
-        }
-        return json;
-    }
-
-    /**
-     * Apply truncation to specified fields in the JSON string.
-     * Reuses the same StringBuilder to minimize allocations.
-     */
-    private String applyFieldTruncation(String json)
-    {
-        if (truncatedFields.isEmpty() || json.isEmpty()) {
-            return json;
-        }
-        for (String field : truncatedFields) {
-            json = truncateFieldInJson(json, field);
-        }
-        return json;
-    }
-
-    /**
-     * Truncate a specific field value in JSON string if it exceeds the size limit.
-     * Works with string values enclosed in quotes. Optimized to avoid substring allocations.
-     */
-    private String truncateFieldInJson(String json, String fieldName)
-    {
-        String fieldPattern = "\"" + fieldName + "\":\"";
-        int fieldIndex = json.indexOf(fieldPattern);
-
-        if (fieldIndex == -1) {
-            return json;
+        if (node instanceof ArrayNode arrayNode) {
+            for (JsonNode childNode : arrayNode) {
+                filterNode(childNode);
+            }
+            return;
         }
 
-        int valueStartIndex = fieldIndex + fieldPattern.length();
-        int valueEndIndex = json.indexOf("\"", valueStartIndex);
-
-        if (valueEndIndex == -1) {
-            return json;
+        if (!(node instanceof ObjectNode objectNode)) {
+            return;
         }
-
-        String fieldValue = json.substring(valueStartIndex, valueEndIndex);
-        byte[] valueBytes = fieldValue.getBytes(StandardCharsets.UTF_8);
 
         long effectiveLimit = Math.min(maxFieldSizeBytes, truncationSizeLimitBytes);
-        if (valueBytes.length <= effectiveLimit) {
-            return json;
+        for (Map.Entry<String, JsonNode> field : objectNode.properties()) {
+            String fieldName = field.getKey();
+            JsonNode value = field.getValue();
+
+            if (excludedFields.contains(fieldName)) {
+                objectNode.putNull(fieldName);
+                continue;
+            }
+
+            if (truncatedFields.contains(fieldName) && value.isTextual()) {
+                String fieldValue = value.asText();
+                if (fieldValue.getBytes(StandardCharsets.UTF_8).length > effectiveLimit) {
+                    objectNode.put(fieldName, truncateString(fieldValue, effectiveLimit));
+                }
+            }
+
+            filterNode(value);
         }
-
-        // Truncate the value
-        String truncatedValue = truncateString(fieldValue, effectiveLimit);
-
-        // Escape quotes in truncated value for JSON using StringBuilder for efficiency
-        String escapedValue = escapeJsonString(truncatedValue);
-
-        // Replace the original value with truncated value
-        return json.substring(0, valueStartIndex) + escapedValue + json.substring(valueEndIndex);
-    }
-
-    private static String nullOutFieldInJson(String json, String fieldName)
-    {
-        String stringFieldPattern = "\"" + fieldName + "\":\"";
-        int fieldIndex = json.indexOf(stringFieldPattern);
-        if (fieldIndex == -1) {
-            return json;
-        }
-
-        int valueStartIndex = fieldIndex + stringFieldPattern.length();
-        int valueEndIndex = json.indexOf("\"", valueStartIndex);
-        if (valueEndIndex == -1) {
-            return json;
-        }
-
-        return json.substring(0, fieldIndex)
-                + "\"" + fieldName + "\":null"
-                + json.substring(valueEndIndex + 1);
     }
 
     /**
@@ -165,27 +140,5 @@ public class QueryEventFieldFilter
         }
 
         return truncated + "...[TRUNCATED]";
-    }
-
-    /**
-     * Escape special JSON characters in a string using StringBuilder to minimize allocations.
-     */
-    private static String escapeJsonString(String str)
-    {
-        StringBuilder result = new StringBuilder(str.length() + 16); // Reserve space for escapes
-        for (int i = 0; i < str.length(); i++) {
-            char c = str.charAt(i);
-            switch (c) {
-                case '\\' -> result.append("\\\\");
-                case '"' -> result.append("\\\"");
-                case '\b' -> result.append("\\b");
-                case '\f' -> result.append("\\f");
-                case '\n' -> result.append("\\n");
-                case '\r' -> result.append("\\r");
-                case '\t' -> result.append("\\t");
-                default -> result.append(c);
-            }
-        }
-        return result.toString();
     }
 }

@@ -63,6 +63,28 @@ logger-event-listener.truncation-size-limit=2KB
 
 When a field exceeds the truncation size limit, it will be truncated with a `...[TRUNCATED]` suffix appended.
 
+#### How `truncated-fields` Works
+
+- `logger-event-listener.truncated-fields` is a comma-separated list of JSON field names.
+- Matching is by field name, not JSON path.
+- Filtering is recursive, so matching names are truncated at any nesting depth (objects and arrays).
+- Only string values are truncated.
+- Effective truncation threshold is `min(max-field-size, truncation-size-limit)`.
+
+Example:
+
+```properties
+logger-event-listener.max-field-size=16KB
+logger-event-listener.truncated-fields=query,plan,stageInfo
+logger-event-listener.truncation-size-limit=2KB
+```
+
+With the config above, every `query`, `plan`, and `stageInfo` string field is truncated to 2KB (or less if `max-field-size` is smaller), including nested occurrences such as:
+- `query`
+- `context.query`
+- `items[0].query`
+- `stageInfo.subStages[2].plan`
+
 ### Event Filtering
 
 Filter out events from being logged based on specific attributes. This is useful for reducing log noise by excluding events you don't care about.
@@ -260,6 +282,26 @@ logger-event-listener.truncation-size-limit=1KB
 logger-event-listener.max-field-size=8KB
 ```
 
+### Example 4: Nested JSON Field Truncation
+
+Apply truncation to repeated field names that appear across nested objects and arrays:
+
+```properties
+event-listener.type=logger
+logger-event-listener.log-created=true
+logger-event-listener.log-completed=true
+
+# Exclude sensitive fields everywhere in JSON
+logger-event-listener.excluded-fields=password,token
+
+# Truncate verbose fields everywhere in JSON (recursive)
+logger-event-listener.truncated-fields=query,plan
+logger-event-listener.truncation-size-limit=1KB
+logger-event-listener.max-field-size=8KB
+```
+
+In this setup, fields like `query` and `plan` are truncated whether they appear at top level or deeply nested.
+
 ### Example 4: Noise Reduction Setup
 
 Filter out routine events to focus on important queries:
@@ -372,4 +414,3 @@ The plugin uses:
 - **Airlift**: For logging and configuration
 - **Jackson**: For JSON serialization
 - **Trino SPI**: For event listener interface
-
