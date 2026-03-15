@@ -16,7 +16,7 @@ package io.trino.plugin.pinot.client;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -65,6 +65,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -151,8 +152,10 @@ public class PinotClient
         this.brokersForTableJsonCodec = requireNonNull(brokersForTableJsonCodec, "brokersForTableJsonCodec is null");
         this.timeBoundaryJsonCodec = requireNonNull(timeBoundaryJsonCodec, "timeBoundaryJsonCodec is null");
         this.tablesJsonCodec = requireNonNull(tablesJsonCodec, "tablesJsonCodec is null");
-        this.schemaJsonCodec = new JsonCodecFactory(() -> new ObjectMapper()
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)).jsonCodec(Schema.class);
+        this.schemaJsonCodec = new JsonCodecFactory(JsonMapper.builder()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .build())
+                .jsonCodec(Schema.class);
         this.brokerResponseCodec = requireNonNull(brokerResponseCodec, "brokerResponseCodec is null");
         this.pinotHostMapper = requireNonNull(pinotHostMapper, "pinotHostMapper is null");
         this.scheme = config.isTlsEnabled() ? "https" : "http";
@@ -407,11 +410,11 @@ public class PinotClient
     {
         Map<String, Map<String, List<String>>> routingTable = sendHttpGetToBrokerJson(tableName, format(ROUTING_TABLE_API_TEMPLATE, tableName), ROUTING_TABLE_CODEC);
         ImmutableMap.Builder<String, Map<String, List<String>>> routingTableMap = ImmutableMap.builder();
-        for (Map.Entry<String, Map<String, List<String>>> entry : routingTable.entrySet()) {
+        for (Entry<String, Map<String, List<String>>> entry : routingTable.entrySet()) {
             String tableNameWithType = entry.getKey();
             if (!entry.getValue().isEmpty() && tableName.equals(extractRawTableName(tableNameWithType))) {
                 ImmutableMap.Builder<String, List<String>> segmentBuilder = ImmutableMap.builder();
-                for (Map.Entry<String, List<String>> segmentEntry : entry.getValue().entrySet()) {
+                for (Entry<String, List<String>> segmentEntry : entry.getValue().entrySet()) {
                     if (!segmentEntry.getValue().isEmpty()) {
                         segmentBuilder.put(segmentEntry.getKey(), segmentEntry.getValue());
                     }

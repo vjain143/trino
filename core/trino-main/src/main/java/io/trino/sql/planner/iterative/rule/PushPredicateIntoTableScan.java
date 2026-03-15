@@ -29,6 +29,7 @@ import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.Constraint;
 import io.trino.spi.connector.ConstraintApplicationResult;
 import io.trino.spi.expression.ConnectorExpression;
+import io.trino.spi.expression.Constant;
 import io.trino.spi.predicate.Domain;
 import io.trino.spi.predicate.TupleDomain;
 import io.trino.sql.PlannerContext;
@@ -48,6 +49,7 @@ import io.trino.sql.planner.plan.ValuesNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -167,7 +169,7 @@ public class PushPredicateIntoTableScan
                 decomposedPredicate.getRemainingExpression());
         Map<String, ColumnHandle> connectorExpressionAssignments = node.getAssignments()
                 .entrySet().stream()
-                .collect(toImmutableMap(entry -> entry.getKey().name(), Map.Entry::getValue));
+                .collect(toImmutableMap(entry -> entry.getKey().name(), Entry::getValue));
 
         Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
 
@@ -194,7 +196,7 @@ public class PushPredicateIntoTableScan
         // check if new domain is wider than domain already provided by table scan
         if (constraint.predicate().isEmpty() &&
                 // TODO do we need to track enforced ConnectorExpression in TableScanNode?
-                io.trino.spi.expression.Constant.TRUE.equals(expressionTranslation.connectorExpression()) &&
+                Constant.TRUE.equals(expressionTranslation.connectorExpression()) &&
                 newDomain.contains(node.getEnforcedConstraint())) {
             Expression resultingPredicate = createResultingPredicate(
                     plannerContext,
@@ -363,7 +365,7 @@ public class PushPredicateIntoTableScan
         Map<ColumnHandle, Domain> predicateDomains = predicate.getDomains().get();
         Map<ColumnHandle, Domain> unenforcedDomains = unenforced.getDomains().get();
         ImmutableMap.Builder<ColumnHandle, Domain> enforcedDomainsBuilder = ImmutableMap.builder();
-        for (Map.Entry<ColumnHandle, Domain> entry : predicateDomains.entrySet()) {
+        for (Entry<ColumnHandle, Domain> entry : predicateDomains.entrySet()) {
             ColumnHandle predicateColumnHandle = entry.getKey();
             Domain predicateDomain = entry.getValue();
             if (unenforcedDomains.containsKey(predicateColumnHandle)) {

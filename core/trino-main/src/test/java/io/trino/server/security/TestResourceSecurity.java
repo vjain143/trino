@@ -14,7 +14,7 @@
 package io.trino.server.security;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -153,7 +153,7 @@ public class TestResourceSecurity
     private static final String UNTRUSTED_CLIENT_AUDIENCE = "https://untrusted.com";
     private static final PrivateKey JWK_PRIVATE_KEY;
     private static final PublicKey JWK_PUBLIC_KEY;
-    private static final ObjectMapper json = new ObjectMapper();
+    private static final JsonMapper json = new JsonMapper();
 
     static {
         try {
@@ -1088,7 +1088,7 @@ public class TestResourceSecurity
                 }
 
                 @Override
-                public Optional<Map<String, Object>> getClaims(String accessToken)
+                public Optional<Map<String, Object>> getAccessTokenClaims(String accessToken)
                 {
                     return Optional.of(jwtParser.parseSignedClaims(accessToken).getPayload());
                 }
