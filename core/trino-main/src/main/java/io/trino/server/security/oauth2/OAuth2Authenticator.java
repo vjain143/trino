@@ -13,6 +13,9 @@
  */
 package io.trino.server.security.oauth2;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
@@ -43,6 +46,9 @@ public class OAuth2Authenticator
         extends AbstractBearerAuthenticator
 {
     private static final Logger log = Logger.get(OAuth2Authenticator.class);
+    private static final String TOKEN_CLAIMS = "internal$token$internal.claims";
+    private static final JsonMapper JSON_MAPPER = new JsonMapper();
+    
     private final OAuth2Client client;
     private final String principalField;
     private final Optional<String> groupsField;
@@ -84,6 +90,7 @@ public class OAuth2Authenticator
         }
         Identity.Builder builder = Identity.forUser(userMapping.mapUser(principal.get()));
         builder.withPrincipal(new BasicPrincipal(principal.get()));
+        builder.withAdditionalExtraCredentials(ImmutableMap.of(TOKEN_CLAIMS, toJson(claims.get())));
         groupsField.flatMap(field -> Optional.ofNullable((List<String>) claims.get().get(field)))
                 .ifPresent(groups -> builder.withGroups(ImmutableSet.copyOf(groups)));
         return Optional.of(builder.build());
@@ -117,5 +124,15 @@ public class OAuth2Authenticator
         URI initiateUri = request.getUriInfo().getBaseUri().resolve(getInitiateUri(authId));
         URI tokenUri = request.getUriInfo().getBaseUri().resolve(getTokenUri(authId));
         return new AuthenticationException(message, format("Bearer x_redirect_server=\"%s\", x_token_server=\"%s\"", initiateUri, tokenUri));
+    }
+
+    private static String toJson(Map<String, Object> claims)
+    {
+        try {
+            return JSON_MAPPER.writeValueAsString(claims);
+        }
+        catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Unable to serialize OAuth2 access token claims", e);
+        }
     }
 }

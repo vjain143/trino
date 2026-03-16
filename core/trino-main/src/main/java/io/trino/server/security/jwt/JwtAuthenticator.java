@@ -13,6 +13,9 @@
  */
 package io.trino.server.security.jwt;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtParser;
@@ -38,6 +41,9 @@ import static java.lang.String.format;
 public class JwtAuthenticator
         extends AbstractBearerAuthenticator
 {
+    private static final String TOKEN_CLAIMS = "internal$token$internal.claims";
+    private static final JsonMapper JSON_MAPPER = new JsonMapper();
+
     private final JwtParser jwtParser;
     private final String principalField;
     private final UserMapping userMapping;
@@ -70,9 +76,10 @@ public class JwtAuthenticator
         if (principal.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(Identity.forUser(userMapping.mapUser(principal.get()))
-                .withPrincipal(new BasicPrincipal(principal.get()))
-                .build());
+        Identity.Builder builder = Identity.forUser(userMapping.mapUser(principal.get()));
+        builder.withPrincipal(new BasicPrincipal(principal.get()));
+        builder.withAdditionalExtraCredentials(ImmutableMap.of(TOKEN_CLAIMS, toJson(claims)));
+        return Optional.of(builder.build());
     }
 
     private void validateAudience(Claims claims)
@@ -102,5 +109,15 @@ public class JwtAuthenticator
     protected AuthenticationException needAuthentication(ContainerRequestContext request, Optional<String> currentToken, String message)
     {
         return new AuthenticationException(message, "Bearer realm=\"Trino\", token_type=\"JWT\"");
+    }
+
+    private static String toJson(Claims claims)
+    {
+        try {
+            return JSON_MAPPER.writeValueAsString(claims);
+        }
+        catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Unable to serialize JWT claims", e);
+        }
     }
 }
