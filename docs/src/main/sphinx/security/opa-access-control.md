@@ -116,8 +116,12 @@ allowed:
 ## OPA configuration
 
 The OPA access control in Trino contacts OPA for each query and issues an
-authorization request. OPA must return a response containing a boolean `allow`
+authorization request. OPA must return a response containing a boolean `result`
 field, which determines whether the operation is permitted or not.
+
+For query execution authorization (`ExecuteQuery`), OPA can additionally include
+an optional top-level `reason` field. If the request is denied and the reason is
+`Approval Required`, Trino marks the query state as `APPROVAL_IN_FLIGHT`.
 
 Policies in OPA are defined with the purpose built policy language Rego. Find
 more information in the [detailed

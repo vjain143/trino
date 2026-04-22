@@ -1,0 +1,604 @@
+{
+  "info": {
+    "_postman_id": "e9c55a1a-9ea1-4cbf-9d8b-f1e7f95c4e7a",
+    "name": "OpenMetadata MCP + API",
+    "description": "Collection for OpenMetadata MCP and related OAuth/config endpoints. Set collection variables before running.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8585"
+    },
+    {
+      "key": "mcpPath",
+      "value": "/mcp"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "clientId",
+      "value": "OpenMetadata"
+    },
+    {
+      "key": "redirectUri",
+      "value": "http://127.0.0.1:3333/callback"
+    },
+    {
+      "key": "scope",
+      "value": "openid profile email offline_access"
+    },
+    {
+      "key": "codeChallenge",
+      "value": ""
+    },
+    {
+      "key": "codeVerifier",
+      "value": ""
+    },
+    {
+      "key": "authCode",
+      "value": ""
+    },
+    {
+      "key": "state",
+      "value": "postman-state-1"
+    },
+    {
+      "key": "toolName",
+      "value": "search_metadata"
+    },
+    {
+      "key": "toolArgumentsJson",
+      "value": "{\n  \"query\": \"customer\",\n  \"entity_type\": \"table\"\n}"
+    },
+    {
+      "key": "apiPath",
+      "value": "/api/v1/users"
+    }
+  ],
+  "item": [
+    {
+      "name": "0) Sanity",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health-check",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health-check"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Template: Any OpenMetadata API (Bearer)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPath}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPath}}"
+              ]
+            },
+            "description": "Set {{apiPath}} to any endpoint, for example /api/v1/tables or /api/v1/users"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1) MCP Config (Admin)",
+      "item": [
+        {
+          "name": "Get MCP Config",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/system/mcp/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "system",
+                "mcp",
+                "config"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update MCP Config (Enable=true)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"baseUrl\": \"{{baseUrl}}\",\n  \"allowedOrigins\": [\"*\"],\n  \"connectTimeout\": 30000,\n  \"readTimeout\": 60000,\n  \"enabled\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/system/mcp/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "system",
+                "mcp",
+                "config"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2) MCP OAuth Flow",
+      "item": [
+        {
+          "name": "Register OAuth Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_name\": \"postman-openmetadata\",\n  \"redirect_uris\": [\"{{redirectUri}}\"],\n  \"grant_types\": [\"authorization_code\", \"refresh_token\"],\n  \"scopes\": [\"openid\", \"profile\", \"email\", \"offline_access\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mcp/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mcp",
+                "register"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  const j = pm.response.json();",
+                  "  if (j.client_id) pm.collectionVariables.set('clientId', j.client_id);",
+                  "} catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Authorize (opens login; copy code from redirect)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mcp/authorize?client_id={{clientId}}&redirect_uri={{redirectUri}}&response_type=code&scope={{scope}}&code_challenge={{codeChallenge}}&code_challenge_method=S256&state={{state}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mcp",
+                "authorize"
+              ],
+              "query": [
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{redirectUri}}"
+                },
+                {
+                  "key": "response_type",
+                  "value": "code"
+                },
+                {
+                  "key": "scope",
+                  "value": "{{scope}}"
+                },
+                {
+                  "key": "code_challenge",
+                  "value": "{{codeChallenge}}"
+                },
+                {
+                  "key": "code_challenge_method",
+                  "value": "S256"
+                },
+                {
+                  "key": "state",
+                  "value": "{{state}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Token Exchange (auth_code -> access_token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code",
+                  "type": "text"
+                },
+                {
+                  "key": "code",
+                  "value": "{{authCode}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{redirectUri}}",
+                  "type": "text"
+                },
+                {
+                  "key": "code_verifier",
+                  "value": "{{codeVerifier}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mcp/token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mcp",
+                "token"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  const j = pm.response.json();",
+                  "  if (j.access_token) pm.collectionVariables.set('accessToken', j.access_token);",
+                  "  if (j.refresh_token) pm.collectionVariables.set('refreshToken', j.refresh_token);",
+                  "} catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "refresh_token",
+                  "type": "text"
+                },
+                {
+                  "key": "refresh_token",
+                  "value": "{{refreshToken}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mcp/token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mcp",
+                "token"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  const j = pm.response.json();",
+                  "  if (j.access_token) pm.collectionVariables.set('accessToken', j.access_token);",
+                  "  if (j.refresh_token) pm.collectionVariables.set('refreshToken', j.refresh_token);",
+                  "} catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3) MCP JSON-RPC (/mcp)",
+      "item": [
+        {
+          "name": "Initialize",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"2024-11-05\",\n    \"capabilities\": {\n      \"tools\": {},\n      \"prompts\": {},\n      \"resources\": {\n        \"subscribe\": true,\n        \"listChanged\": true\n      }\n    },\n    \"clientInfo\": {\n      \"name\": \"postman-client\",\n      \"version\": \"1.0.0\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpPath}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{mcpPath}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tools List",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpPath}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{mcpPath}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Prompts List",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"prompts/list\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpPath}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{mcpPath}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Resources List",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"resources/list\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpPath}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{mcpPath}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tool Call (edit tool + args)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 5,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"{{toolName}}\",\n    \"arguments\": {{toolArgumentsJson}}\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpPath}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{mcpPath}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

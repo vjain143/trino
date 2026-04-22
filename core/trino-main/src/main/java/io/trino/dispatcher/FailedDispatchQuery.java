@@ -34,6 +34,7 @@ import io.trino.spi.resourcegroups.ResourceGroupId;
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.concurrent.Executor;
@@ -48,6 +49,8 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class FailedDispatchQuery
         implements DispatchQuery
 {
+    private static final String APPROVAL_REQUIRED_TEXT = "approval required";
+
     private final QueryInfo fullQueryInfo;
     private final BasicQueryInfo basicQueryInfo;
     private final Session session;
@@ -121,7 +124,7 @@ public class FailedDispatchQuery
     @Override
     public void addStateChangeListener(StateChangeListener<QueryState> stateChangeListener)
     {
-        executor.execute(() -> stateChangeListener.stateChanged(QueryState.FAILED));
+        executor.execute(() -> stateChangeListener.stateChanged(fullQueryInfo.getState()));
     }
 
     @Override
@@ -221,10 +224,11 @@ public class FailedDispatchQuery
             NodeVersion version)
     {
         ExecutionFailureInfo failureCause = toFailure(throwable);
+        QueryState queryState = resolveImmediateFailureState(throwable);
         QueryInfo queryInfo = new QueryInfo(
                 session.getQueryId(),
                 session.toSessionRepresentation(),
-                QueryState.FAILED,
+                queryState,
                 self,
                 ImmutableList.of(),
                 query,
@@ -261,6 +265,17 @@ public class FailedDispatchQuery
                 version);
 
         return queryInfo;
+    }
+
+    private static QueryState resolveImmediateFailureState(Throwable throwable)
+    {
+        for (Throwable current = throwable; current != null; current = current.getCause()) {
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase(Locale.ENGLISH).contains(APPROVAL_REQUIRED_TEXT)) {
+                return QueryState.APPROVAL_IN_FLIGHT;
+            }
+        }
+        return QueryState.FAILED;
     }
 
     private static QueryStats immediateFailureQueryStats()

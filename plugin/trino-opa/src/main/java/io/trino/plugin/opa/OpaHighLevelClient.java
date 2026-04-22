@@ -39,6 +39,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
@@ -52,6 +53,8 @@ import static java.util.Objects.requireNonNull;
 
 public class OpaHighLevelClient
 {
+    private static final String APPROVAL_REQUIRED_REASON = "approval required";
+
     private final JsonCodec<OpaQueryResult> queryResultCodec;
     private final JsonCodec<OpaRowFiltersQueryResult> rowFiltersQueryResultCodec;
     private final JsonCodec<OpaColumnMaskQueryResult> columnMaskQueryResultCodec;
@@ -86,7 +89,12 @@ public class OpaHighLevelClient
 
     public boolean queryOpa(OpaQueryInput input)
     {
-        return opaHttpClient.consumeOpaResponse(opaHttpClient.submitOpaRequest(input, opaPolicyUri, queryResultCodec)).result();
+        return queryOpaResult(input).result();
+    }
+
+    public OpaQueryResult queryOpaResult(OpaQueryInput input)
+    {
+        return opaHttpClient.consumeOpaResponse(opaHttpClient.submitOpaRequest(input, opaPolicyUri, queryResultCodec));
     }
 
     private boolean queryOpaWithSimpleAction(OpaQueryContext context, String operation)
@@ -117,7 +125,11 @@ public class OpaHighLevelClient
             Runnable deny,
             OpaQueryInputResource resource)
     {
-        if (!queryOpaWithSimpleResource(context, actionName, resource)) {
+        OpaQueryResult queryResult = queryOpaResult(buildQueryInputForSimpleResource(context, actionName, resource));
+        if (!queryResult.result()) {
+            if (isApprovalRequired(queryResult)) {
+                throw new AccessDeniedException("Approval Required");
+            }
             deny.run();
             // we should never get here because deny should throw
             throw new AccessDeniedException("Access denied for action %s and resource %s".formatted(actionName, resource));
@@ -129,7 +141,11 @@ public class OpaHighLevelClient
             String actionName,
             Runnable deny)
     {
-        if (!queryOpaWithSimpleAction(context, actionName)) {
+        OpaQueryResult queryResult = queryOpaResult(buildQueryInputForSimpleAction(context, actionName));
+        if (!queryResult.result()) {
+            if (isApprovalRequired(queryResult)) {
+                throw new AccessDeniedException("Approval Required");
+            }
             deny.run();
             // we should never get here because deny should throw
             throw new AccessDeniedException("Access denied for action %s".formatted(actionName));
@@ -202,6 +218,14 @@ public class OpaHighLevelClient
     private static OpaQueryInput buildQueryInputForSimpleAction(OpaQueryContext context, String operation)
     {
         return new OpaQueryInput(context, OpaQueryInputAction.builder().operation(operation).build());
+    }
+
+    private static boolean isApprovalRequired(OpaQueryResult queryResult)
+    {
+        return Optional.ofNullable(queryResult.reason())
+                .map(reason -> reason.toLowerCase(Locale.ENGLISH))
+                .map(reason -> reason.contains(APPROVAL_REQUIRED_REASON))
+                .orElse(false);
     }
 
     private static Map<String, String> loadAdditionalContextFromFile(Optional<Path> additionalContextFile)

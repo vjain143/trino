@@ -88,6 +88,22 @@ final class TestOpaResponseDecoding
     }
 
     @Test
+    void testSingleResponseWithReason()
+    {
+        OpaQueryResult result = this.responseCodec.fromJson(
+                """
+                {
+                    "decision_id": "foo",
+                    "result": false,
+                    "reason": "Approval Required"
+                }\
+                """);
+        assertThat(result.result()).isFalse();
+        assertThat(result.decisionId()).isEqualTo("foo");
+        assertThat(result.reason()).isEqualTo("Approval Required");
+    }
+
+    @Test
     void testUndefinedDecisionSingleResponseTreatedAsDeny()
     {
         OpaQueryResult result = this.responseCodec.fromJson("{}");

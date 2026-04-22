@@ -49,6 +49,10 @@ public enum QueryState
      */
     FINISHING(false),
     /**
+     * Query execution is paused pending an external approval decision.
+     */
+    APPROVAL_IN_FLIGHT(true),
+    /**
      * Query has finished executing and all output has been consumed.
      */
     FINISHED(true),

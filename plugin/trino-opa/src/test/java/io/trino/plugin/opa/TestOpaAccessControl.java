@@ -29,6 +29,7 @@ import io.trino.spi.connector.CatalogSchemaName;
 import io.trino.spi.connector.CatalogSchemaRoutineName;
 import io.trino.spi.connector.CatalogSchemaTableName;
 import io.trino.spi.connector.ColumnSchema;
+import io.trino.spi.security.AccessDeniedException;
 import io.trino.spi.security.Identity;
 import io.trino.spi.security.PrincipalType;
 import io.trino.spi.security.SystemAccessControlFactory;
@@ -79,6 +80,7 @@ import static io.trino.plugin.opa.TestHelpers.createMockHttpClient;
 import static io.trino.plugin.opa.TestHelpers.createOpaAuthorizer;
 import static io.trino.plugin.opa.TestHelpers.createResponseHandlerForParallelColumnMasking;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 final class TestOpaAccessControl
 {
@@ -99,6 +101,27 @@ final class TestOpaAccessControl
                         """));
         OpaAccessControl authorizer = createOpaAuthorizer(simpleOpaConfig(), mockClient);
         authorizer.checkCanExecuteQuery(TEST_IDENTITY, TEST_QUERY_ID);
+    }
+
+    @Test
+    void testApprovalRequiredResponseForExecuteQuery()
+    {
+        InstrumentedHttpClient mockClient = createMockHttpClient(
+                OPA_SERVER_URI,
+                buildValidatingRequestHandler(
+                        TEST_IDENTITY,
+                        200,
+                        """
+                        {
+                            "decision_id": "foo",
+                            "result": false,
+                            "reason": "Approval Required"
+                        }\
+                        """));
+        OpaAccessControl authorizer = createOpaAuthorizer(simpleOpaConfig(), mockClient);
+        assertThatThrownBy(() -> authorizer.checkCanExecuteQuery(TEST_IDENTITY, TEST_QUERY_ID))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Approval Required");
     }
 
     @Test

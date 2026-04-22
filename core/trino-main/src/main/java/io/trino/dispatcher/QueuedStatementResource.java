@@ -89,7 +89,6 @@ import static io.trino.client.ProtocolHeaders.TRINO_HEADERS;
 import static io.trino.dispatcher.QueuedStatementResource.SubmissionState.ABANDONED;
 import static io.trino.dispatcher.QueuedStatementResource.SubmissionState.NOT_SUBMITTED;
 import static io.trino.dispatcher.QueuedStatementResource.SubmissionState.SUBMITTED;
-import static io.trino.execution.QueryState.FAILED;
 import static io.trino.execution.QueryState.QUEUED;
 import static io.trino.server.ServletSecurityUtils.authenticatedIdentity;
 import static io.trino.server.ServletSecurityUtils.clearAuthenticatedIdentity;
@@ -278,12 +277,12 @@ public class QueuedStatementResource
             QueryId queryId,
             URI nextUri,
             Optional<QueryError> queryError,
+            QueryState queryState,
             ExternalUriInfo externalUriInfo,
             Optional<URI> queryInfoUrl,
             Duration elapsedTime,
             Duration queuedTime)
     {
-        QueryState state = queryError.map(error -> FAILED).orElse(QUEUED);
         return new QueryResults(
                 queryId.id(),
                 getQueryInfoUri(queryInfoUrl, queryId, externalUriInfo),
@@ -292,8 +291,8 @@ public class QueuedStatementResource
                 null,
                 QueryData.NULL,
                 StatementStats.builder()
-                        .setState(state.toString())
-                        .setQueued(state == QUEUED)
+                        .setState(queryState.toString())
+                        .setQueued(queryState == QUEUED)
                         .setProgressPercentage(OptionalDouble.empty())
                         .setRunningPercentage(OptionalDouble.empty())
                         .setElapsedTimeMillis(elapsedTime.toMillis())
@@ -404,14 +403,16 @@ public class QueuedStatementResource
                 return createQueryResults(
                         token + 1,
                         externalUriInfo,
-                        DispatchInfo.queued(NO_DURATION, NO_DURATION));
+                        DispatchInfo.queued(NO_DURATION, NO_DURATION),
+                        QUEUED);
             }
 
             DispatchInfo dispatchInfo = dispatchManager.getDispatchInfo(queryId)
                     // query should always be found, but it may have just been determined to be abandoned
                     .orElseThrow(NotFoundException::new);
+            QueryState queryState = dispatchManager.getQueryInfo(queryId).getState();
 
-            return createQueryResults(token + 1, externalUriInfo, dispatchInfo);
+            return createQueryResults(token + 1, externalUriInfo, dispatchInfo, queryState);
         }
 
         public void cancel()
@@ -425,7 +426,7 @@ public class QueuedStatementResource
             sessionContext.getIdentity().destroy();
         }
 
-        private QueryResults createQueryResults(long token, ExternalUriInfo externalUriInfo, DispatchInfo dispatchInfo)
+        private QueryResults createQueryResults(long token, ExternalUriInfo externalUriInfo, DispatchInfo dispatchInfo, QueryState queryState)
         {
             URI nextUri = getNextUri(token, externalUriInfo, dispatchInfo);
 
@@ -436,6 +437,7 @@ public class QueuedStatementResource
                     queryId,
                     nextUri,
                     queryError,
+                    queryState,
                     externalUriInfo,
                     queryInfoUrl,
                     dispatchInfo.getElapsedTime(),

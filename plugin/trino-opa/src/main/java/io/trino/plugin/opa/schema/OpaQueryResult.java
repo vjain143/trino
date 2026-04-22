@@ -15,4 +15,7 @@ package io.trino.plugin.opa.schema;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public record OpaQueryResult(@JsonProperty("decision_id") String decisionId, boolean result) {}
+public record OpaQueryResult(
+        @JsonProperty("decision_id") String decisionId,
+        boolean result,
+        @JsonProperty("reason") String reason) {}
